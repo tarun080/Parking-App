@@ -1,0 +1,91 @@
+<resources>
+    <string name="app_name">Smart Parking</string>
+    <string name="app_tagline">Find Parking Spaces Easily</string>
+    <string name="app_logo">App Logo</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="forgot_password">Forgot Password?</string>
+    <string name="login">Login</string>
+    <string name="or">OR</string>
+    <string name="create_account">Create Account</string>
+    <string name="full_name">Full Name</string>
+    <string name="phone_number">Phone Number</string>
+    <string name="confirm_password">Confirm Password</string>
+    <string name="register">Register</string>
+    <string name="already_have_account">Already have an account? Login</string>
+    <string name="back">Back</string>
+    <string name="forgot_password_instructions">Enter your email address below. We\'ll send you a link to reset your password.</string>
+    <string name="reset_password">Reset Password</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="profile_picture">Profile Picture</string>
+    <string name="menu_map">Map</string>
+    <string name="menu_bookings">My Bookings</string>
+    <string name="menu_profile">Profile</string>
+    <string name="menu_settings">Settings</string>
+    <string name="menu_logout">Logout</string>
+    <string name="other">Other</string>
+    <!-- TODO: Remove or change this placeholder text -->
+    <string name="hello_blank_fragment">Hello blank fragment</string>
+    <string name="my_location">My Location</string>
+
+    <!-- Profile Fragment -->
+    <string name="personal_information">Personal Information</string>
+    <string name="edit_profile">Edit Profile</string>
+    <string name="my_vehicles">My Vehicles</string>
+    <string name="add">Add</string>
+    <string name="no_vehicles">No vehicles added yet</string>
+
+    <!-- Bookings Fragment -->
+    <string name="no_bookings">No bookings found</string>
+
+    <!-- Add these to app/src/main/res/values/strings.xml -->
+    <string name="search_parking">Search for parking</string>
+    <string name="filter">Filter</string>
+    <string name="close">Close</string>
+    <string name="availability">Availability</string>
+    <string name="rate">Rate</string>
+    <string name="book_now">Book Now</string>
+    <string name="no_spots_available">No Spots Available</string>
+    <string name="filter_parking">Filter Parking</string>
+    <string name="search_radius">Search Radius</string>
+    <string name="radius_km">%1$.1f km</string>
+    <string name="reset">Reset</string>
+    <string name="apply">Apply</string>
+    <!-- Add these to app/src/main/res/values/strings.xml -->
+    <string name="booking_details">Booking Details</string>
+    <string name="booking_time">Booking Time</string>
+    <string name="duration">Duration</string>
+    <string name="status">Status</string>
+    <string name="total_amount">Total Amount</string>
+    <string name="payment_status">Payment Status</string>
+    <string name="cancel_booking">Cancel Booking</string>
+    <string name="create_booking">Create Booking</string>
+    <string name="start_time">Start Time</string>
+    <string name="end_time">End Time</string>
+    <string name="select_vehicle">Select Vehicle</string>
+    <string name="cancel">Cancel</string>
+    <!-- Add these to app/src/main/res/values/strings.xml -->
+    <string name="scan_to_park">Scan this QR code at the parking entrance</string>
+    <string name="booking_qr_code">Booking QR Code</string>
+    <string name="overlapping_booking">You already have a booking at this time</string>
+    <string name="parking_duration">Parking Duration</string>
+    <!-- In strings.xml -->
+    <string-array name="vehicle_types">
+        <item>Sedan</item>
+        <item>SUV</item>
+        <item>Hatchback</item>
+        <item>Truck</item>
+        <item>Van</item>
+        <item>Motorcycle</item>
+    </string-array>
+
+    <!-- Complete the vehicle-related strings in strings.xml -->
+    <string name="add_vehicle">Add Vehicle</string>
+    <string name="license_plate">License Plate</string>
+    <string name="make">Make</string>
+    <string name="model">Model</string>
+    <string name="color">Color</string>
+    <string name="vehicle_type">Vehicle Type</string>
+    <string name="save">Save</string>
+</resources>

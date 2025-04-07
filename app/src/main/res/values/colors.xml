@@ -1,0 +1,11 @@
+<resources>
+    <color name="colorPrimary">#3F51B5</color>
+    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorAccent">#FF4081</color>
+    <color name="colorBackground">#FFFFFF</color>
+    <color name="colorText">#212121</color>
+    <color name="colorTextLight">#757575</color>
+    <color name="colorAvailable">#4CAF50</color>
+    <color name="colorUnavailable">#F44336</color>
+    <color name="colorBooked">#FFC107</color>
+</resources>
