@@ -1,10 +1,14 @@
 package com.smartparking.activities;
 
 import android.Manifest;
+import android.app.AlarmManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -46,6 +50,35 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     private NavController navController;
     private AppBarConfiguration appBarConfiguration;
 
+    private void requestRequiredPermissions() {
+        // Request notification permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this, Manifest.permission.POST_NOTIFICATIONS) !=
+                    PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        100);
+            }
+        }
+
+        // Request alarm scheduling permission for Android 12+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                intent.putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+                if (intent.resolveActivity(getPackageManager()) != null) {
+                    startActivity(intent);
+                } else {
+                    Log.e("MainActivity", "Cannot open alarm settings");
+                    Toast.makeText(this, "Please grant permission to schedule alarms in system settings",
+                            Toast.LENGTH_LONG).show();
+                }
+            }
+        }
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -53,6 +86,7 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         // Request notification permission
         requestNotificationPermission();
+        requestRequiredPermissions();
 
         // Initialize views
         toolbar = findViewById(R.id.toolbar);
@@ -241,7 +275,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
             // Handle notification permission result
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Permission granted
+                Log.d("MainActivity", "Notification permission granted");
             } else {
+                Log.e("MainActivity", "Notification permission denied");
                 Toast.makeText(this, "Notification permission required for booking alerts", Toast.LENGTH_LONG).show();
             }
         }

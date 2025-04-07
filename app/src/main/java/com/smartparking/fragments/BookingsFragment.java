@@ -66,6 +66,11 @@ public class BookingsFragment extends Fragment implements BookingAdapter.Booking
         tabLayout.addTab(tabLayout.newTab().setText("Upcoming"));
         tabLayout.addTab(tabLayout.newTab().setText("Past"));
 
+        boolean isDemo = false; // Set this based on your app's needs or a settings preference
+        if (isDemo) {
+            bookingViewModel.generateMockBookings();
+        }
+
         tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
             @Override
             public void onTabSelected(TabLayout.Tab tab) {

@@ -1,3 +1,4 @@
+// app/src/main/java/com/smartparking/repositories/BookingRepository.java
 package com.smartparking.repositories;
 
 import android.app.Application;
@@ -65,8 +66,30 @@ public class BookingRepository {
         return bookingDao.getBookingById(bookingId);
     }
 
+    // In BookingRepository.java, update the getActiveBookingsForUser method
     public LiveData<List<Booking>> getActiveBookingsForUser(String userId) {
-        return bookingDao.getActiveBookingsForUser(userId);
+        // First, try to get from Room database
+        LiveData<List<Booking>> roomBookings = bookingDao.getActiveBookingsForUser(userId);
+
+        // Also fetch fresh data from Firestore
+        firestore.collection("bookings")
+                .whereEqualTo("userId", userId)
+                .whereIn("bookingStatus", Arrays.asList("RESERVED", "ACTIVE"))
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    List<Booking> bookings = new ArrayList<>();
+                    for (QueryDocumentSnapshot document : queryDocumentSnapshots) {
+                        Booking booking = document.toObject(Booking.class);
+                        bookings.add(booking);
+
+                        // Update local database
+                        insertBooking(booking);
+                    }
+                    Log.d(TAG, "Fetched " + bookings.size() + " active bookings for user " + userId);
+                })
+                .addOnFailureListener(e -> Log.e(TAG, "Error fetching active bookings", e));
+
+        return roomBookings;
     }
 
     public LiveData<List<Booking>> getPastBookingsForUser(String userId) {
@@ -90,6 +113,19 @@ public class BookingRepository {
                     Log.d(TAG, "Fetched " + bookings.size() + " bookings for user " + userId);
                 })
                 .addOnFailureListener(e -> Log.e(TAG, "Error fetching bookings", e));
+    }
+
+    public void addMockBookingToFirestore(Booking booking) {
+        // Add to Firestore
+        firestore.collection("bookings")
+                .document(booking.getBookingId())
+                .set(booking)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Mock booking added to Firestore");
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error adding mock booking", e);
+                });
     }
 
     public MutableLiveData<Boolean> createBooking(Booking booking, ParkingSpace parkingSpace) {
@@ -166,10 +202,10 @@ public class BookingRepository {
                             // Update booking status
                             booking.setBookingStatus("CANCELLED");
 
-                            // Update in Firestore
+                            // Update in Firestore with the full booking object, not just one field
                             firestore.collection("bookings")
                                     .document(bookingId)
-                                    .update("bookingStatus", "CANCELLED")
+                                    .set(booking)  // Use set instead of update to ensure all fields are updated
                                     .addOnSuccessListener(aVoid -> {
                                         Log.d(TAG, "Booking cancelled in Firestore");
 
@@ -177,28 +213,7 @@ public class BookingRepository {
                                         updateBooking(booking);
 
                                         // Restore available spot in parking space
-                                        firestore.collection("parkingSpaces")
-                                                .document(booking.getParkingSpaceId())
-                                                .get()
-                                                .addOnSuccessListener(parkingDoc -> {
-                                                    if (parkingDoc.exists()) {
-                                                        ParkingSpace parkingSpace = parkingDoc.toObject(ParkingSpace.class);
-                                                        if (parkingSpace != null) {
-                                                            int newAvailableSpots = parkingSpace.getAvailableSpots() + 1;
-
-                                                            // Update in Firestore
-                                                            firestore.collection("parkingSpaces")
-                                                                    .document(booking.getParkingSpaceId())
-                                                                    .update("availableSpots", newAvailableSpots)
-                                                                    .addOnSuccessListener(aVoid2 -> {
-                                                                        Log.d(TAG, "Parking space updated in Firestore, available spots: " + newAvailableSpots);
-                                                                    })
-                                                                    .addOnFailureListener(e -> {
-                                                                        Log.e(TAG, "Error updating parking space", e);
-                                                                    });
-                                                        }
-                                                    }
-                                                });
+                                        restoreParkingSpaceSpot(booking.getParkingSpaceId());
 
                                         success.setValue(true);
                                     })
@@ -221,6 +236,39 @@ public class BookingRepository {
                 });
 
         return success;
+    }
+
+    // Add this helper method to handle restoring parking space spots
+    private void restoreParkingSpaceSpot(String parkingSpaceId) {
+        if (parkingSpaceId.startsWith("parking-")) {
+            // This is a mock parking space, no need to update in Firestore
+            Log.d(TAG, "Mock parking space, no need to restore spots");
+            return;
+        }
+
+        // For real parking spaces, restore the spot in Firestore
+        firestore.collection("parkingSpaces")
+                .document(parkingSpaceId)
+                .get()
+                .addOnSuccessListener(parkingDoc -> {
+                    if (parkingDoc.exists()) {
+                        ParkingSpace parkingSpace = parkingDoc.toObject(ParkingSpace.class);
+                        if (parkingSpace != null) {
+                            int newAvailableSpots = parkingSpace.getAvailableSpots() + 1;
+
+                            // Update in Firestore
+                            firestore.collection("parkingSpaces")
+                                    .document(parkingSpaceId)
+                                    .update("availableSpots", newAvailableSpots)
+                                    .addOnSuccessListener(aVoid2 -> {
+                                        Log.d(TAG, "Parking space updated in Firestore, available spots: " + newAvailableSpots);
+                                    })
+                                    .addOnFailureListener(e -> {
+                                        Log.e(TAG, "Error updating parking space", e);
+                                    });
+                        }
+                    }
+                });
     }
 
     public LiveData<Boolean> canCreateBooking(String userId, String parkingSpaceId, long startTime, long endTime) {

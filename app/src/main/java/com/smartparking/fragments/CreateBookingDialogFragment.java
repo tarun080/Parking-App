@@ -3,6 +3,7 @@ package com.smartparking.fragments;
 
 import android.app.DatePickerDialog;
 import android.app.TimePickerDialog;
+import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -28,6 +29,7 @@ import com.smartparking.R;
 import com.smartparking.models.ParkingSpace;
 import com.smartparking.models.Vehicle;
 import com.smartparking.repositories.BookingRepository;
+import com.smartparking.utils.NotificationHelper;
 import com.smartparking.viewmodels.BookingViewModel;
 
 import java.text.SimpleDateFormat;
@@ -65,12 +67,25 @@ public class CreateBookingDialogFragment extends BottomSheetDialogFragment {
     private SimpleDateFormat dateTimeFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
     private int durationHours = 2; // Default 2 hours
 
+    // Reference to activity context
+    private Context activityContext;
+
+    // Flag to track if we're using mock data
+    private boolean usingMockData = false;
+
     public static CreateBookingDialogFragment newInstance(String parkingId) {
         CreateBookingDialogFragment fragment = new CreateBookingDialogFragment();
         Bundle args = new Bundle();
         args.putString(ARG_PARKING_ID, parkingId);
         fragment.setArguments(args);
         return fragment;
+    }
+
+    @Override
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
+        // Store activity context
+        activityContext = context;
     }
 
     @Override
@@ -153,8 +168,16 @@ public class CreateBookingDialogFragment extends BottomSheetDialogFragment {
         textViewEndTime.setOnClickListener(v -> showDateTimePicker(false));
         buttonBook.setOnClickListener(v -> createBooking());
 
-        // Load parking space details
-        loadParkingSpaceDetails();
+        // Check if we have mock data in arguments
+        if (getArguments() != null
+                && getArguments().getString("name") != null
+                && !getArguments().getString("name").isEmpty()) {
+            // Create parking space from arguments
+            createParkingSpaceFromArguments();
+        } else {
+            // Load parking space details from Firestore
+            loadParkingSpaceDetails();
+        }
 
         // Load user vehicles
         loadUserVehicles();
@@ -167,10 +190,49 @@ public class CreateBookingDialogFragment extends BottomSheetDialogFragment {
 
         // Observe booking errors
         bookingViewModel.getBookingError().observe(getViewLifecycleOwner(), error -> {
-            if (error != null && !error.isEmpty()) {
-                Toast.makeText(getContext(), error, Toast.LENGTH_SHORT).show();
+            if (error != null && !error.isEmpty() && isAdded()) {
+                safeShowToast(error);
             }
         });
+    }
+
+    private void createParkingSpaceFromArguments() {
+        Bundle args = getArguments();
+        if (args != null) {
+            String name = args.getString("name", "");
+            String address = args.getString("address", "");
+            int availableSpots = args.getInt("availableSpots", 0);
+            int totalSpots = args.getInt("totalSpots", 0);
+            double hourlyRate = args.getDouble("hourlyRate", 0.0);
+            double latitude = args.getDouble("latitude", 0.0);
+            double longitude = args.getDouble("longitude", 0.0);
+
+            // Create a mock parking space
+            parkingSpace = new ParkingSpace(
+                    parkingId,
+                    name,
+                    address,
+                    latitude,
+                    longitude,
+                    totalSpots,
+                    hourlyRate,
+                    "mock_owner"
+            );
+            parkingSpace.setAvailableSpots(availableSpots);
+
+            // Update UI
+            textViewParkingName.setText(name);
+            textViewAddress.setText(address);
+            String rateStr = "$" + String.format(Locale.getDefault(), "%.2f", hourlyRate) + " / hour";
+            textViewRate.setText(rateStr);
+
+            updateTotalAmount();
+
+            // Set flag for mock data
+            usingMockData = true;
+
+            Log.d(TAG, "Created parking space from arguments: " + name);
+        }
     }
 
     private void loadParkingSpaceDetails() {
@@ -178,7 +240,7 @@ public class CreateBookingDialogFragment extends BottomSheetDialogFragment {
 
         if (parkingId == null || parkingId.isEmpty()) {
             Log.e(TAG, "Parking ID is null or empty");
-            Toast.makeText(getContext(), "Invalid parking space ID", Toast.LENGTH_SHORT).show();
+            safeShowToast("Invalid parking space ID");
             dismiss();
             return;
         }
@@ -187,29 +249,37 @@ public class CreateBookingDialogFragment extends BottomSheetDialogFragment {
                 .document(parkingId)
                 .get()
                 .addOnSuccessListener(documentSnapshot -> {
-                    if (documentSnapshot.exists()) {
-                        parkingSpace = documentSnapshot.toObject(ParkingSpace.class);
-                        if (parkingSpace != null) {
-                            textViewParkingName.setText(parkingSpace.getName());
-                            textViewAddress.setText(parkingSpace.getAddress());
+                    if (isAdded()) {
+                        if (documentSnapshot.exists()) {
+                            parkingSpace = documentSnapshot.toObject(ParkingSpace.class);
+                            if (parkingSpace != null) {
+                                textViewParkingName.setText(parkingSpace.getName());
+                                textViewAddress.setText(parkingSpace.getAddress());
 
-                            String rateStr = "$" + String.format(Locale.getDefault(), "%.2f", parkingSpace.getHourlyRate()) + " / hour";
-                            textViewRate.setText(rateStr);
+                                String rateStr = "$" + String.format(Locale.getDefault(), "%.2f", parkingSpace.getHourlyRate()) + " / hour";
+                                textViewRate.setText(rateStr);
 
-                            updateTotalAmount();
+                                updateTotalAmount();
+                            }
+                        } else {
+                            Log.e(TAG, "Parking space document doesn't exist");
+                            safeShowToast("Parking space not found");
+                            dismiss();
                         }
                     }
                 })
                 .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error loading parking space details", e);
-                    Toast.makeText(getContext(), "Error loading parking space details", Toast.LENGTH_SHORT).show();
-                    dismiss();
+                    if (isAdded()) {
+                        Log.e(TAG, "Error loading parking space details", e);
+                        safeShowToast("Error loading parking space details");
+                        dismiss();
+                    }
                 });
     }
 
     private void loadUserVehicles() {
         if (userId.isEmpty()) {
-            Toast.makeText(getContext(), "User not logged in", Toast.LENGTH_SHORT).show();
+            safeShowToast("User not logged in");
             dismiss();
             return;
         }
@@ -218,19 +288,50 @@ public class CreateBookingDialogFragment extends BottomSheetDialogFragment {
                 .whereEqualTo("userId", userId)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
-                    userVehicles.clear();
-                    vehicleDisplayList.clear();
+                    if (isAdded()) {
+                        userVehicles.clear();
+                        vehicleDisplayList.clear();
 
-                    for (DocumentSnapshot document : queryDocumentSnapshots) {
-                        Vehicle vehicle = document.toObject(Vehicle.class);
-                        if (vehicle != null) {
-                            userVehicles.add(vehicle);
-                            vehicleDisplayList.add(vehicle.getMake() + " " + vehicle.getModel() + " (" + vehicle.getLicensePlate() + ")");
+                        for (DocumentSnapshot document : queryDocumentSnapshots) {
+                            Vehicle vehicle = document.toObject(Vehicle.class);
+                            if (vehicle != null) {
+                                userVehicles.add(vehicle);
+                                vehicleDisplayList.add(vehicle.getMake() + " " + vehicle.getModel() + " (" + vehicle.getLicensePlate() + ")");
+                            }
+                        }
+
+                        // If no vehicles, add a default option
+                        if (userVehicles.isEmpty()) {
+                            // Add a dummy vehicle for testing
+                            Vehicle dummyVehicle = new Vehicle(
+                                    "vehicle1",
+                                    userId,
+                                    "MH01AB1234",
+                                    "Toyota",
+                                    "Corolla",
+                                    "White",
+                                    "Sedan"
+                            );
+                            userVehicles.add(dummyVehicle);
+                            vehicleDisplayList.add(dummyVehicle.getMake() + " " + dummyVehicle.getModel() + " (" + dummyVehicle.getLicensePlate() + ")");
+                        }
+
+                        // Setup spinner
+                        if (getContext() != null) {
+                            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                                    getContext(),
+                                    android.R.layout.simple_spinner_item,
+                                    vehicleDisplayList
+                            );
+                            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                            spinnerVehicle.setAdapter(adapter);
                         }
                     }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Error loading user vehicles", e);
 
-                    // If no vehicles, add a default option
-                    if (userVehicles.isEmpty()) {
+                    if (isAdded()) {
                         // Add a dummy vehicle for testing
                         Vehicle dummyVehicle = new Vehicle(
                                 "vehicle1",
@@ -243,87 +344,68 @@ public class CreateBookingDialogFragment extends BottomSheetDialogFragment {
                         );
                         userVehicles.add(dummyVehicle);
                         vehicleDisplayList.add(dummyVehicle.getMake() + " " + dummyVehicle.getModel() + " (" + dummyVehicle.getLicensePlate() + ")");
+
+                        // Setup spinner
+                        if (getContext() != null) {
+                            ArrayAdapter<String> adapter = new ArrayAdapter<>(
+                                    getContext(),
+                                    android.R.layout.simple_spinner_item,
+                                    vehicleDisplayList
+                            );
+                            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+                            spinnerVehicle.setAdapter(adapter);
+                        }
                     }
-
-                    // Setup spinner
-                    ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                            requireContext(),
-                            android.R.layout.simple_spinner_item,
-                            vehicleDisplayList
-                    );
-                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    spinnerVehicle.setAdapter(adapter);
-                })
-                .addOnFailureListener(e -> {
-                    Log.e(TAG, "Error loading user vehicles", e);
-
-                    // Add a dummy vehicle for testing
-                    Vehicle dummyVehicle = new Vehicle(
-                            "vehicle1",
-                            userId,
-                            "MH01AB1234",
-                            "Toyota",
-                            "Corolla",
-                            "White",
-                            "Sedan"
-                    );
-                    userVehicles.add(dummyVehicle);
-                    vehicleDisplayList.add(dummyVehicle.getMake() + " " + dummyVehicle.getModel() + " (" + dummyVehicle.getLicensePlate() + ")");
-
-                    // Setup spinner
-                    ArrayAdapter<String> adapter = new ArrayAdapter<>(
-                            requireContext(),
-                            android.R.layout.simple_spinner_item,
-                            vehicleDisplayList
-                    );
-                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-                    spinnerVehicle.setAdapter(adapter);
                 });
     }
 
     private void showDateTimePicker(boolean isStartTime) {
         final Calendar calendar = isStartTime ? startCalendar : endCalendar;
 
-        // Show date picker
-        DatePickerDialog datePickerDialog = new DatePickerDialog(
-                requireContext(),
-                (view, year, month, dayOfMonth) -> {
-                    calendar.set(Calendar.YEAR, year);
-                    calendar.set(Calendar.MONTH, month);
-                    calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+        if (isAdded() && getContext() != null) {
+            // Show date picker
+            DatePickerDialog datePickerDialog = new DatePickerDialog(
+                    getContext(),
+                    (view, year, month, dayOfMonth) -> {
+                        calendar.set(Calendar.YEAR, year);
+                        calendar.set(Calendar.MONTH, month);
+                        calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth);
 
-                    // Show time picker
-                    TimePickerDialog timePickerDialog = new TimePickerDialog(
-                            requireContext(),
-                            (view1, hourOfDay, minute) -> {
-                                calendar.set(Calendar.HOUR_OF_DAY, hourOfDay);
-                                calendar.set(Calendar.MINUTE, minute);
+                        if (isAdded() && getContext() != null) {
+                            // Show time picker
+                            TimePickerDialog timePickerDialog = new TimePickerDialog(
+                                    getContext(),
+                                    (view1, hourOfDay, minute) -> {
+                                        calendar.set(Calendar.HOUR_OF_DAY, hourOfDay);
+                                        calendar.set(Calendar.MINUTE, minute);
 
-                                // If start time changed, update end time based on duration
-                                if (isStartTime) {
-                                    updateEndTime();
-                                } else {
-                                    // If end time was directly set, calculate new duration
-                                    long diffMillis = endCalendar.getTimeInMillis() - startCalendar.getTimeInMillis();
-                                    durationHours = Math.max(1, (int) (diffMillis / (1000 * 60 * 60)));
-                                    seekBarDuration.setProgress(durationHours);
-                                    updateDurationText();
-                                }
+                                        // If start time changed, update end time based on duration
+                                        if (isStartTime) {
+                                            updateEndTime();
+                                        } else {
+                                            // If end time was directly set, calculate new duration
+                                            long diffMillis = endCalendar.getTimeInMillis() - startCalendar.getTimeInMillis();
+                                            durationHours = Math.max(1, (int) (diffMillis / (1000 * 60 * 60)));
+                                            seekBarDuration.setProgress(durationHours);
+                                            updateDurationText();
+                                        }
 
-                                updateTimeDisplay();
-                                updateTotalAmount();
-                            },
-                            calendar.get(Calendar.HOUR_OF_DAY),
-                            calendar.get(Calendar.MINUTE),
-                            true
-                    );
-                    timePickerDialog.show();
-                },
-                calendar.get(Calendar.YEAR),
-                calendar.get(Calendar.MONTH),
-                calendar.get(Calendar.DAY_OF_MONTH)
-        );
-        datePickerDialog.show();
+                                        updateTimeDisplay();
+                                        updateTotalAmount();
+                                    },
+                                    calendar.get(Calendar.HOUR_OF_DAY),
+                                    calendar.get(Calendar.MINUTE),
+                                    true
+                            );
+                            timePickerDialog.show();
+                        }
+                    },
+                    calendar.get(Calendar.YEAR),
+                    calendar.get(Calendar.MONTH),
+                    calendar.get(Calendar.DAY_OF_MONTH)
+            );
+            datePickerDialog.show();
+        }
     }
 
     private void updateDurationText() {
@@ -357,14 +439,16 @@ public class CreateBookingDialogFragment extends BottomSheetDialogFragment {
         }
     }
 
+    // In CreateBookingDialogFragment.java, update the createBooking method
+
     private void createBooking() {
         if (parkingSpace == null) {
-            Toast.makeText(getContext(), "Parking space details not available", Toast.LENGTH_SHORT).show();
+            safeShowToast("Parking space details not available");
             return;
         }
 
         if (userVehicles.isEmpty() || spinnerVehicle.getSelectedItemPosition() < 0) {
-            Toast.makeText(getContext(), "Please select a vehicle", Toast.LENGTH_SHORT).show();
+            safeShowToast("Please select a vehicle");
             return;
         }
 
@@ -375,34 +459,85 @@ public class CreateBookingDialogFragment extends BottomSheetDialogFragment {
         // Get selected vehicle
         Vehicle selectedVehicle = userVehicles.get(spinnerVehicle.getSelectedItemPosition());
 
-        // Check if user already has a booking at this time
-        BookingRepository bookingRepo = new BookingRepository(requireActivity().getApplication());
-        bookingRepo.canCreateBooking(
-                userId,
-                parkingSpace.getSpaceId(),
-                startCalendar.getTimeInMillis(),
-                endCalendar.getTimeInMillis()
-        ).observe(getViewLifecycleOwner(), canBook -> {
-            if (canBook) {
-                // Create booking
-                bookingViewModel.createBooking(
-                        parkingSpace.getSpaceId(),
-                        selectedVehicle.getVehicleId(),
-                        startCalendar.getTimeInMillis(),
-                        endCalendar.getTimeInMillis()
-                );
+        if (usingMockData) {
+            // For mock data, directly create booking
+            Log.d(TAG, "Creating booking for mock parking space: " + parkingSpace.getName());
 
-                // Close dialog on success
-                bookingViewModel.getBookingInProgress().observe(getViewLifecycleOwner(), inProgress -> {
-                    if (!inProgress) {
-                        dismiss();
-                    }
-                });
-            } else {
-                buttonBook.setEnabled(true);
-                buttonBook.setText(R.string.book_now);
-                Toast.makeText(getContext(), "You already have an overlapping booking. Please choose a different time.", Toast.LENGTH_LONG).show();
-            }
-        });
+            // Calculate booking amount
+            long durationMillis = endCalendar.getTimeInMillis() - startCalendar.getTimeInMillis();
+            double durationHours = durationMillis / (1000.0 * 60 * 60);
+            double amount = parkingSpace.getHourlyRate() * durationHours;
+
+            // Create booking in view model
+            bookingViewModel.createBooking(
+                    parkingSpace.getSpaceId(),
+                    selectedVehicle.getVehicleId(),
+                    startCalendar.getTimeInMillis(),
+                    endCalendar.getTimeInMillis()
+            );
+
+            // Manually show a notification since we're using mock data
+            NotificationHelper.showBookingConfirmationNotification(
+                    requireContext(),
+                    "mock-booking-" + System.currentTimeMillis(),
+                    parkingSpace.getName()
+            );
+
+            // Show success message and close dialog
+            safeShowToast("Booking created successfully");
+            dismiss();
+        } else {
+            // For real data, check if user already has a booking at this time
+            BookingRepository bookingRepo = new BookingRepository(requireActivity().getApplication());
+            bookingRepo.canCreateBooking(
+                    userId,
+                    parkingSpace.getSpaceId(),
+                    startCalendar.getTimeInMillis(),
+                    endCalendar.getTimeInMillis()
+            ).observe(getViewLifecycleOwner(), canBook -> {
+                if (canBook) {
+                    // Create booking
+                    bookingViewModel.createBooking(
+                            parkingSpace.getSpaceId(),
+                            selectedVehicle.getVehicleId(),
+                            startCalendar.getTimeInMillis(),
+                            endCalendar.getTimeInMillis()
+                    );
+
+                    // Manually show success message
+                    safeShowToast("Booking created successfully");
+
+                    // Close dialog on success
+                    bookingViewModel.getBookingInProgress().observe(getViewLifecycleOwner(), inProgress -> {
+                        if (!inProgress) {
+                            dismiss();
+                        }
+                    });
+                } else {
+                    buttonBook.setEnabled(true);
+                    buttonBook.setText(R.string.book_now);
+                    safeShowToast("You already have an overlapping booking. Please choose a different time.");
+                }
+            });
+        }
+    }
+
+    // Safe method to show a toast that checks if fragment is attached
+    private void safeShowToast(String message) {
+        if (isAdded() && getContext() != null) {
+            Toast.makeText(getContext(), message, Toast.LENGTH_LONG).show();
+        } else if (activityContext != null) {
+            // Use stored activity context if fragment context is not available
+            Toast.makeText(activityContext, message, Toast.LENGTH_LONG).show();
+        } else {
+            Log.e(TAG, "Cannot show toast: " + message);
+        }
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+        // Clear the activity context reference
+        activityContext = null;
     }
 }

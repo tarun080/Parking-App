@@ -24,7 +24,7 @@ public class ParkingSpace {
     private boolean isActive;
     private String ownerId;
 
-    // Keep this constructor for Room to use
+    // Default constructor required by Room
     public ParkingSpace() {
         // Required empty constructor for Firebase and Room
     }

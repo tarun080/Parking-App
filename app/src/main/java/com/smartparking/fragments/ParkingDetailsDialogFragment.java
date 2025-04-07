@@ -30,6 +30,8 @@ public class ParkingDetailsDialogFragment extends BottomSheetDialogFragment {
     private static final String ARG_AVAILABLE_SPOTS = "availableSpots";
     private static final String ARG_TOTAL_SPOTS = "totalSpots";
     private static final String ARG_HOURLY_RATE = "hourlyRate";
+    private static final String ARG_LATITUDE = "latitude";
+    private static final String ARG_LONGITUDE = "longitude";
 
     private String parkingId;
     private String name;
@@ -37,6 +39,8 @@ public class ParkingDetailsDialogFragment extends BottomSheetDialogFragment {
     private int availableSpots;
     private int totalSpots;
     private double hourlyRate;
+    private double latitude;
+    private double longitude;
 
     private TextView textViewName;
     private TextView textViewAddress;
@@ -65,6 +69,8 @@ public class ParkingDetailsDialogFragment extends BottomSheetDialogFragment {
             availableSpots = getArguments().getInt(ARG_AVAILABLE_SPOTS, 0);
             totalSpots = getArguments().getInt(ARG_TOTAL_SPOTS, 0);
             hourlyRate = getArguments().getDouble(ARG_HOURLY_RATE, 0.0);
+            latitude = getArguments().getDouble(ARG_LATITUDE, 0.0);
+            longitude = getArguments().getDouble(ARG_LONGITUDE, 0.0);
         }
 
         setStyle(DialogFragment.STYLE_NORMAL, R.style.ThemeOverlay_App_BottomSheetDialog);
@@ -102,7 +108,6 @@ public class ParkingDetailsDialogFragment extends BottomSheetDialogFragment {
         // Set click listeners
         buttonBook.setOnClickListener(v -> bookParking());
         imageViewClose.setOnClickListener(v -> dismiss());
-
     }
 
     private void updateUIFromArguments() {
@@ -177,8 +182,6 @@ public class ParkingDetailsDialogFragment extends BottomSheetDialogFragment {
         dismiss();
     }
 
-
-
     private void bookParking() {
         Log.d(TAG, "Book parking: " + parkingId);
 
@@ -188,9 +191,41 @@ public class ParkingDetailsDialogFragment extends BottomSheetDialogFragment {
             return;
         }
 
-        // Show create booking dialog
-        CreateBookingDialogFragment dialogFragment = CreateBookingDialogFragment.newInstance(parkingId);
-        dialogFragment.show(getParentFragmentManager(), "create_booking");
+        // Create a temporary ParkingSpace object for mock data if needed
+        if (name != null && !name.isEmpty()) {
+            // Create a ParkingSpace object from the passed arguments
+            ParkingSpace mockSpace = new ParkingSpace(
+                    parkingId,
+                    name,
+                    address,
+                    latitude,
+                    longitude,
+                    totalSpots,
+                    hourlyRate,
+                    "mock_owner"
+            );
+            mockSpace.setAvailableSpots(availableSpots);
+
+            // Store in Bundle to pass to CreateBookingDialogFragment
+            Bundle args = new Bundle();
+            args.putString("parking_id", parkingId);
+            args.putString("name", name);
+            args.putString("address", address);
+            args.putInt("availableSpots", availableSpots);
+            args.putInt("totalSpots", totalSpots);
+            args.putDouble("hourlyRate", hourlyRate);
+            args.putDouble("latitude", latitude);
+            args.putDouble("longitude", longitude);
+
+            // Show create booking dialog with the mock data
+            CreateBookingDialogFragment dialogFragment = CreateBookingDialogFragment.newInstance(parkingId);
+            dialogFragment.setArguments(args);
+            dialogFragment.show(getParentFragmentManager(), "create_booking");
+        } else {
+            // Show create booking dialog
+            CreateBookingDialogFragment dialogFragment = CreateBookingDialogFragment.newInstance(parkingId);
+            dialogFragment.show(getParentFragmentManager(), "create_booking");
+        }
 
         // Close this dialog
         dismiss();

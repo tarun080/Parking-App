@@ -372,16 +372,22 @@ public class MapFragment extends Fragment {
         displayParkingSpaces(filteredSpaces);
     }
 
+    // Update this method in MapFragment.java
     private void showParkingDetailsDialog(ParkingSpace parkingSpace) {
         Log.d(TAG, "Showing details dialog for " + parkingSpace.getName());
         ParkingDetailsDialogFragment dialogFragment = ParkingDetailsDialogFragment.newInstance(parkingSpace.getSpaceId());
-        // We need to pass the parking space to the dialog since it might not be in Firestore
+
+        // We need to pass the parking space details to the dialog
         Bundle args = new Bundle();
+        args.putString("parking_id", parkingSpace.getSpaceId());
         args.putString("name", parkingSpace.getName());
         args.putString("address", parkingSpace.getAddress());
         args.putInt("availableSpots", parkingSpace.getAvailableSpots());
         args.putInt("totalSpots", parkingSpace.getTotalSpots());
         args.putDouble("hourlyRate", parkingSpace.getHourlyRate());
+        args.putDouble("latitude", parkingSpace.getLatitude());
+        args.putDouble("longitude", parkingSpace.getLongitude());
+
         dialogFragment.setArguments(args);
         dialogFragment.show(getParentFragmentManager(), "parking_details");
     }

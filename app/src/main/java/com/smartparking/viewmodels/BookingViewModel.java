@@ -2,6 +2,7 @@
 package com.smartparking.viewmodels;
 
 import android.app.Application;
+import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.lifecycle.AndroidViewModel;
@@ -16,8 +17,11 @@ import com.smartparking.repositories.BookingRepository;
 import com.smartparking.repositories.ParkingRepository;
 
 import java.util.List;
+import java.util.UUID;
 
 public class BookingViewModel extends AndroidViewModel {
+
+    private static final String TAG = "BookingViewModel";
 
     private final BookingRepository bookingRepository;
     private final ParkingRepository parkingRepository;
@@ -35,12 +39,23 @@ public class BookingViewModel extends AndroidViewModel {
         userId = currentUser != null ? currentUser.getUid() : "";
 
         if (!userId.isEmpty()) {
+            // Only fetch existing bookings from Firestore, don't generate mock ones automatically
             bookingRepository.fetchBookingsFromFirestore(userId);
         }
     }
 
     public LiveData<List<Booking>> getAllBookings() {
         return bookingRepository.getBookingsByUserId(userId);
+    }
+
+    private boolean mockDataGenerated = false;
+
+    // Generate mock bookings for testing - only when explicitly called
+    public void generateMockBookings() {
+        if (!userId.isEmpty() && !mockDataGenerated) {
+            bookingRepository.generateMockBookings(userId);
+            mockDataGenerated = true;
+        }
     }
 
     public LiveData<List<Booking>> getActiveBookings() {
@@ -71,31 +86,85 @@ public class BookingViewModel extends AndroidViewModel {
 
         bookingInProgress.setValue(true);
 
-        // Get parking space details
-        parkingRepository.getParkingSpaceById(parkingSpaceId).observeForever(parkingSpace -> {
-            if (parkingSpace != null) {
-                // Create booking object
-                Booking booking = bookingRepository.createBookingObject(
-                        userId,
-                        parkingSpaceId,
-                        vehicleId,
-                        startTime,
-                        endTime,
-                        parkingSpace.getHourlyRate()
-                );
+        // Check if this is a mock parking space ID (usually starts with "parking-")
+        if (parkingSpaceId.startsWith("parking-")) {
+            Log.d(TAG, "Creating booking for mock parking space: " + parkingSpaceId);
 
-                // Create booking in repository
-                bookingRepository.createBooking(booking, parkingSpace).observeForever(success -> {
+            // For mock data, create a booking directly
+            createMockBooking(parkingSpaceId, vehicleId, startTime, endTime);
+        } else {
+            // For real data, get parking space details first
+            parkingRepository.getParkingSpaceById(parkingSpaceId).observeForever(parkingSpace -> {
+                if (parkingSpace != null) {
+                    // Create booking object
+                    Booking booking = bookingRepository.createBookingObject(
+                            userId,
+                            parkingSpaceId,
+                            vehicleId,
+                            startTime,
+                            endTime,
+                            parkingSpace.getHourlyRate()
+                    );
+
+                    // Create booking in repository
+                    bookingRepository.createBooking(booking, parkingSpace).observeForever(success -> {
+                        bookingInProgress.setValue(false);
+                        if (!success) {
+                            bookingError.setValue("Failed to create booking");
+                        }
+                    });
+                } else {
                     bookingInProgress.setValue(false);
-                    if (!success) {
-                        bookingError.setValue("Failed to create booking");
-                    }
-                });
-            } else {
-                bookingInProgress.setValue(false);
-                bookingError.setValue("Parking space not found");
-            }
-        });
+                    bookingError.setValue("Parking space not found");
+                }
+            });
+        }
+    }
+
+    private void createMockBooking(String parkingSpaceId, String vehicleId, long startTime, long endTime) {
+        try {
+            // Create a default mock space with reasonable values
+            ParkingSpace mockSpace = new ParkingSpace(
+                    parkingSpaceId,
+                    "Mock Parking Space",
+                    "Mock Address",
+                    0, 0,
+                    10,
+                    2.0,
+                    "mock_owner"
+            );
+
+            // Create a booking object
+            String bookingId = UUID.randomUUID().toString();
+            long durationMillis = endTime - startTime;
+            double durationHours = durationMillis / (1000.0 * 60 * 60);
+            double totalAmount = mockSpace.getHourlyRate() * durationHours;
+
+            Booking booking = new Booking(
+                    bookingId,
+                    userId,
+                    parkingSpaceId,
+                    vehicleId,
+                    startTime,
+                    endTime,
+                    totalAmount
+            );
+
+            // Add to local Room database
+            bookingRepository.insertBooking(booking);
+
+            // Add to Firestore
+            bookingRepository.addMockBookingToFirestore(booking);
+
+            // Success
+            bookingInProgress.setValue(false);
+
+            Log.d(TAG, "Mock booking created successfully: " + bookingId);
+        } catch (Exception e) {
+            Log.e(TAG, "Error creating mock booking", e);
+            bookingInProgress.setValue(false);
+            bookingError.setValue("Error creating booking: " + e.getMessage());
+        }
     }
 
     public void cancelBooking(String bookingId) {
@@ -107,12 +176,5 @@ public class BookingViewModel extends AndroidViewModel {
                 bookingError.setValue("Failed to cancel booking");
             }
         });
-    }
-
-    // Generate mock bookings for testing
-    public void generateMockBookings() {
-        if (!userId.isEmpty()) {
-            bookingRepository.generateMockBookings(userId);
-        }
     }
 }
