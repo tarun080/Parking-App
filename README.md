@@ -21,7 +21,9 @@ A comprehensive mobile application that helps users find and book parking spaces
   <img src="screenshots/Splash_Screen.jpg" width="200" alt="Splash Screen">
   <img src="screenshots/Login.jpg" width="200" alt="Login Screen">
   <img src="screenshots/Map.jpg" width="200" alt="Map View">
+  <img src="screenshots/Book_Space.jpg" width="200" alt="Book Space">
   <img src="screenshots/Booking_Details.jpg" width="200" alt="Booking Details">
+  <img src="screenshots/Notification.jpg" width="200" alt="Notification">
 </div>
 
 ## Technologies Used
