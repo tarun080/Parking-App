@@ -10,6 +10,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -20,6 +21,7 @@ import androidx.fragment.app.DialogFragment;
 import androidx.lifecycle.ViewModelProvider;
 
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.zxing.BarcodeFormat;
@@ -54,6 +56,7 @@ public class BookingDetailsDialogFragment extends BottomSheetDialogFragment {
     private ImageView imageViewQRCode;
     private Button buttonAction;
     private ImageView imageViewClose;
+    private ProgressBar progressBar;
 
     private SimpleDateFormat dateFormat = new SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault());
 
@@ -89,6 +92,7 @@ public class BookingDetailsDialogFragment extends BottomSheetDialogFragment {
 
         Log.d(TAG, "Dialog view created for booking: " + bookingId);
 
+
         // Initialize views
         textViewParkingName = view.findViewById(R.id.textViewParkingName);
         textViewAddress = view.findViewById(R.id.textViewAddress);
@@ -111,25 +115,152 @@ public class BookingDetailsDialogFragment extends BottomSheetDialogFragment {
         imageViewClose.setOnClickListener(v -> dismiss());
     }
 
+    // In BookingDetailsDialogFragment.java
+
     private void loadBookingDetails() {
         Log.d(TAG, "Loading booking details for ID: " + bookingId);
 
         if (bookingId != null) {
+            // Show loading indicator
+            if (progressBar != null) {
+                progressBar.setVisibility(View.VISIBLE);
+            }
+
+            // First try loading from Room database via ViewModel
             bookingViewModel.getBookingById(bookingId).observe(getViewLifecycleOwner(), booking -> {
                 if (booking != null) {
-                    Log.d(TAG, "Booking loaded: " + booking.getBookingId());
+                    Log.d(TAG, "Booking loaded from Room: " + booking.getBookingId());
                     updateUI(booking);
+
+                    // Hide loading indicator
+                    if (progressBar != null) {
+                        progressBar.setVisibility(View.GONE);
+                    }
 
                     // Load parking space details
                     loadParkingSpaceDetails(booking.getParkingSpaceId());
                 } else {
-                    Log.e(TAG, "Booking not found");
-                    showErrorAndDismiss();
+                    Log.d(TAG, "Booking not found in Room, trying Firestore directly");
+
+                    // Try to load from Firestore directly as a fallback
+                    FirebaseFirestore.getInstance().collection("bookings")
+                            .document(bookingId)
+                            .get()
+                            .addOnSuccessListener(documentSnapshot -> {
+                                if (documentSnapshot.exists()) {
+                                    Booking firebaseBooking = documentSnapshot.toObject(Booking.class);
+                                    if (firebaseBooking != null) {
+                                        Log.d(TAG, "Booking loaded from Firestore: " + firebaseBooking.getBookingId());
+                                        updateUI(firebaseBooking);
+
+                                        // Hide loading indicator
+                                        if (progressBar != null) {
+                                            progressBar.setVisibility(View.GONE);
+                                        }
+
+                                        // Load parking space details
+                                        loadParkingSpaceDetails(firebaseBooking.getParkingSpaceId());
+                                    } else {
+                                        Log.e(TAG, "Booking could not be converted from Firestore document");
+                                        showErrorAndStay();
+                                    }
+                                } else {
+                                    Log.e(TAG, "Booking not found in Firestore either");
+                                    showErrorAndStay();
+                                }
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Error loading booking from Firestore", e);
+                                showErrorAndStay();
+                            });
                 }
             });
         } else {
             Log.e(TAG, "Booking ID is null");
-            showErrorAndDismiss();
+            showErrorAndStay();
+        }
+    }
+
+    // Add this method to create a mock booking for the notification
+    private void createMockBookingForNotification(String mockBookingId) {
+        // Extract timestamp from mock-booking-timestamp format if possible
+        long timestamp = System.currentTimeMillis();
+        try {
+            String[] parts = mockBookingId.split("-");
+            if (parts.length > 2) {
+                timestamp = Long.parseLong(parts[2]);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error parsing mock booking ID", e);
+        }
+
+        // Create a mock booking with relevant details
+        Booking mockBooking = new Booking();
+        mockBooking.setBookingId(mockBookingId);
+        mockBooking.setUserId(FirebaseAuth.getInstance().getUid());
+        mockBooking.setStartTime(timestamp);
+        mockBooking.setEndTime(timestamp + (2 * 60 * 60 * 1000)); // 2 hours duration
+        mockBooking.setTotalAmount(10.0);
+        mockBooking.setBookingStatus("RESERVED");
+        mockBooking.setPaymentStatus("PENDING");
+
+        // For the parking space, use one from the mock data
+        String mockParkingId = "parking-college"; // Default mock parking
+        mockBooking.setParkingSpaceId(mockParkingId);
+
+        // Update UI with this mock booking
+        updateUI(mockBooking);
+
+        // Also load the mock parking space details
+        loadMockParkingSpaceDetails(mockParkingId);
+    }
+
+    // Add this method to load mock parking space details
+    private void loadMockParkingSpaceDetails(String mockParkingId) {
+        // Create a mock parking space
+        ParkingSpace mockSpace = new ParkingSpace(
+                mockParkingId,
+                "College Parking",
+                "Mukesh Patel School, Vile Parle West, Mumbai",
+                19.1079172,
+                72.834547,
+                40,
+                2.00,
+                "owner1"
+        );
+
+        // Update the UI with this mock parking space
+        textViewParkingName.setText(mockSpace.getName());
+        textViewAddress.setText(mockSpace.getAddress());
+    }
+
+    // Change this method to show error but not dismiss
+    private void showErrorAndStay() {
+        // Hide loading indicator
+        if (progressBar != null) {
+            progressBar.setVisibility(View.GONE);
+        }
+
+        Toast.makeText(getContext(), "Booking details not available", Toast.LENGTH_SHORT).show();
+
+        // Instead of dismissing, show some placeholder info
+        textViewParkingName.setText("Booking Information");
+        textViewAddress.setText("Booking details could not be loaded");
+        textViewTime.setText("Time information not available");
+        textViewDuration.setText("--");
+        textViewStatus.setText("UNKNOWN");
+        textViewAmount.setText("$--.--");
+        textViewPaymentStatus.setText("--");
+
+        // Hide QR code
+        if (imageViewQRCode != null) {
+            imageViewQRCode.setVisibility(View.GONE);
+        }
+
+        // Change button text
+        if (buttonAction != null) {
+            buttonAction.setText("Close");
+            buttonAction.setOnClickListener(v -> dismiss());
         }
     }
 

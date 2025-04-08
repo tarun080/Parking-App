@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.Menu;
@@ -124,8 +125,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         // Setup booking observers to refresh map when bookings change
         setupBookingObservers();
 
-        // Handle notification deep links
-        handleNotificationDeepLink();
+        // Handle notification deep links with a slight delay
+        new Handler().postDelayed(this::handleNotificationDeepLink, 500);
     }
 
     private void requestNotificationPermission() {
@@ -145,7 +146,10 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra("bookingId")) {
             String bookingId = intent.getStringExtra("bookingId");
+            String notificationType = intent.getStringExtra("notification_type");
+
             if (bookingId != null && !bookingId.isEmpty()) {
+                Log.d("MainActivity", "Showing booking details for: " + bookingId);
                 // Show booking details
                 BookingDetailsDialogFragment dialogFragment =
                         BookingDetailsDialogFragment.newInstance(bookingId);
@@ -158,7 +162,8 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        handleNotificationDeepLink();
+        // Add a slight delay to ensure activity is fully ready
+        new Handler().postDelayed(this::handleNotificationDeepLink, 300);
     }
 
     private void setupBookingObservers() {
