@@ -142,8 +142,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
     private void handleNotificationDeepLink() {
         // Check if activity was started from a notification
-        if (getIntent().hasExtra("bookingId")) {
-            String bookingId = getIntent().getStringExtra("bookingId");
+        Intent intent = getIntent();
+        if (intent != null && intent.hasExtra("bookingId")) {
+            String bookingId = intent.getStringExtra("bookingId");
             if (bookingId != null && !bookingId.isEmpty()) {
                 // Show booking details
                 BookingDetailsDialogFragment dialogFragment =
@@ -151,6 +152,13 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
                 dialogFragment.show(getSupportFragmentManager(), "booking_details");
             }
         }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleNotificationDeepLink();
     }
 
     private void setupBookingObservers() {

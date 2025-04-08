@@ -12,7 +12,7 @@
         android:layout_width="150dp"
         android:layout_height="150dp"
         android:contentDescription="@string/app_logo"
-        android:src="@drawable/ic_logo"
+        android:src="@drawable/ic_smart_parking_round"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"

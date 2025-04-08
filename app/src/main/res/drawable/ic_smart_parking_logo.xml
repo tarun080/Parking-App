@@ -1,20 +1,24 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
+    android:width="512dp"
+    android:height="512dp"
     android:viewportWidth="512"
-    android:viewportHeight="512"
-    android:tint="#FFFFFF">
+    android:viewportHeight="512">
+    <path
+        android:pathData="M256,256m-256,0a256,256 0,1 1,512 0a256,256 0,1 1,-512 0"
+        android:fillColor="#3F51B5"/>
     <path
         android:pathData="M196,156L316,156A40,40 0,0 1,356 196L356,316A40,40 0,0 1,316 356L196,356A40,40 0,0 1,156 316L156,196A40,40 0,0 1,196 156z"
         android:fillColor="#FFFFFF"/>
-    <!-- Add the "P" letter but make it white for notifications -->
+    <!-- Add the "P" letter -->
     <path
         android:pathData="M210,200L245,200Q270,200 270,225Q270,250 245,250L230,250L230,310L210,310L210,200Z"
-        android:fillColor="#000000"/>
+        android:fillColor="#3F51B5"/>
     <path
         android:pathData="M350,380L380,380Q400,380 405,360L420,300Q425,280 410,270Q395,260 370,260L330,260L350,380Z"
-        android:fillColor="#FFFFFF"/>
+        android:strokeAlpha="0.7"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.7"/>
     <path
         android:pathData="M360,390m-15,0a15,15 0,1 1,30 0a15,15 0,1 1,-30 0"
-        android:fillColor="#FFFFFF"/>
+        android:fillColor="#2196F3"/>
 </vector>

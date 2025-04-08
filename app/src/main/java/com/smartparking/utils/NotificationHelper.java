@@ -54,7 +54,7 @@ public class NotificationHelper {
                 context,
                 0,
                 intent,
-                PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
         // Build the notification

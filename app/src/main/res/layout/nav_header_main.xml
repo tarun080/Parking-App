@@ -15,7 +15,7 @@
         android:layout_height="64dp"
         android:contentDescription="@string/profile_picture"
         android:paddingTop="8dp"
-        app:srcCompat="@drawable/ic_profile" />
+        app:srcCompat="@drawable/ic_smart_parking_round" />
 
     <TextView
         android:id="@+id/textViewName"
