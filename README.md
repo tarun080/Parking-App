@@ -102,10 +102,6 @@ app/
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Contact
-
-Project Link: [https://github.com/yourusername/smart-parking-app](https://github.com/yourusername/smart-parking-app)
-
 ---
 
 Note: This application is a demonstration project and not intended for commercial use without proper modifications and testing.
